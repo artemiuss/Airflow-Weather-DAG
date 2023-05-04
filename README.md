@@ -26,9 +26,14 @@ docker compose --profile flower up -d
 docker compose down
 ```
 
+### Setting up the connections
+```
+docker exec -it airflow-airflow-scheduler-1 airflow connections add 'weather_api_conn' --conn-uri 'https://api.openweathermap.org'
+```
+
 ### Setting up the variables
 ```
-docker exec -it airflow-airflow-scheduler-1 airflow variables set WEATHER_API_KEY "???"
+docker exec -it airflow-airflow-scheduler-1 airflow variables set WEATHER_API_KEY <YOUR_OPENWEATHERMAP_API_KEY>
 ```
 
 ### Copy the DAG to the dags folder
