@@ -15,29 +15,10 @@ cities_list = [
     {"city": "Zhmerynka", "lat": "49.03705", "lon": "28.11201"}
 ]
 
-# request_params = {
-#     "appid": Variable.get("WEATHER_API_KEY"),
-#     "lat": "",
-#     "lon": "",
-#     "dt": "",
-#     "units": "metric"
-# }
-request_params = {
-    "appid": Variable.get("WEATHER_API_KEY"),
-    "lat": "49.842957",
-    "lon": "24.031111",
-    "dt": "{{ execution_date.int_timestamp }}",
-    "units": "metric"
-}
-
-{'lat': 49.843, 'lon': 24.0311, 'timezone': 'Europe/Kiev', 'timezone_offset': 10800, 'data': [{'dt': 1683221127, 'sunrise': 1683168974, 'sunset': 1683222303, 'temp': 9.04, 'feels_like': 7.77, 'pressure': 1023, 'humidity': 85, 'dew_point': 6.66, 'uvi': 0.08, 'clouds': 98, 'visibility': 10000, 'wind_speed': 2.39, 'wind_deg': 67, 'wind_gust': 4.29, 'weather': [{'id': 804, 'main': 'Clouds', 'description': 'overcast clouds', 'icon': '04d'}]}]}
-
-def process_weather(ti):
-    info = ti.xcom_pull("extract_data")
+def process_weather(city, ti):
+    info = ti.xcom_pull("extract_data_{}".format(city["city"]))
 
     return {
-        #"city": city.name,
-        "city": "qqq",
         "execution_time": info["data"][0]["dt"],
         "temperature": info["data"][0]["temp"],
         "humidity": info["data"][0]["clouds"],
@@ -63,35 +44,50 @@ with DAG(dag_id="weather_dag",
                 wind_speed     NUMERIC);"""
         )
 
-    check_api = HttpSensor(
-        task_id="check_api",
-        http_conn_id="weather_api_conn",
-        endpoint="data/3.0/onecall/timemachine?",
-        request_params=request_params)
+    for city in cities_list:
+        request_params = {
+            "appid": Variable.get("WEATHER_API_KEY"),
+            "lat": city["lat"],
+            "lon": city["lon"],
+            "dt": "{{ execution_date.int_timestamp }}",
+            "units": "metric"
+        }
 
-    extract_data = SimpleHttpOperator(
-        task_id="extract_data",
-        http_conn_id="weather_api_conn",
-        endpoint="data/3.0/onecall/timemachine?",
-        data=request_params,
-        method="GET",
-        response_filter=lambda x: json.loads(x.text),
-        log_response=True)
+        check_api = HttpSensor(
+            task_id="check_api_{}".format(city["city"]),
+            http_conn_id="weather_api_conn",
+            endpoint="data/3.0/onecall/timemachine?",
+            request_params=request_params)
 
-    process_data = PythonOperator(
-        task_id="process_data",
-        python_callable=process_weather)
+        extract_data = SimpleHttpOperator(
+            task_id="extract_data_{}".format(city["city"]),
+            http_conn_id="weather_api_conn",
+            endpoint="data/3.0/onecall/timemachine?",
+            data=request_params,
+            method="GET",
+            response_filter=lambda x: json.loads(x.text),
+            log_response=True)
 
-    insert_data = PostgresOperator(
-        task_id="insert_data",
-        postgres_conn_id="pg_conn",
-        sql="""INSERT INTO measures (city, execution_time, temperature, humidity, cloudiness, wind_speed) VALUES 
-            ('{{ti.xcom_pull(task_ids='process_data')['city']}}',
-            to_timestamp({{ti.xcom_pull(task_ids='process_data')['execution_time']}}),
-            {{ti.xcom_pull(task_ids='process_data')['temperature']}},
-            {{ti.xcom_pull(task_ids='process_data')['humidity']}},
-            {{ti.xcom_pull(task_ids='process_data')['cloudiness']}},
-            {{ti.xcom_pull(task_ids='process_data')['wind_speed']}});""")
+        process_data = PythonOperator(
+            task_id="process_data_{}".format(city["city"]),
+            python_callable=process_weather,
+            op_args=[city])
 
-    db_create_table >> check_api >> extract_data >> process_data >> insert_data
+        insert_data = PostgresOperator(
+            task_id="insert_data_{}".format(city["city"]),
+            postgres_conn_id="pg_conn",
+            sql=f"""INSERT INTO measures (city, execution_time, temperature, humidity, cloudiness, wind_speed) VALUES 
+                (%(city)s,
+                to_timestamp( {{{{ ti.xcom_pull(task_ids='{'process_data_{}'.format(city["city"])}')['execution_time'] }}}} ),
+                {{{{ ti.xcom_pull(task_ids='{'process_data_{}'.format(city["city"])}')['temperature'] }}}},
+                {{{{ ti.xcom_pull(task_ids='{'process_data_{}'.format(city["city"])}')['humidity'] }}}},
+                {{{{ ti.xcom_pull(task_ids='{'process_data_{}'.format(city["city"])}')['cloudiness'] }}}},
+                {{{{ ti.xcom_pull(task_ids='{'process_data_{}'.format(city["city"])}')['wind_speed'] }}}}
+                )
+                ;""",
+            parameters={"city": city["city"]})
+        
+        db_create_table >> check_api >> extract_data >> process_data >> insert_data
+
+
 
