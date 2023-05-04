@@ -29,6 +29,7 @@ docker compose down
 ### Setting up the connections
 ```
 docker exec -it airflow-airflow-scheduler-1 airflow connections add 'weather_api_conn' --conn-uri 'https://api.openweathermap.org'
+docker exec -it airflow-airflow-scheduler-1 airflow connections add 'pg_conn' --conn-uri 'postgresql://airflow:airflow@localhos:5432/airflow'
 ```
 
 ### Setting up the variables
