@@ -33,7 +33,7 @@ docker exec -it airflow-airflow-scheduler-1 airflow variables set WEATHER_API_KE
 
 ### Copy the DAG to the dags folder
 ```
-cp weather_dag.py ~/airflow/dags
+cp dags/weather_dag.py ~/airflow/dags
 ```
 
 ## Executing the DAG
