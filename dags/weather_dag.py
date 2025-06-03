@@ -21,8 +21,8 @@ def process_weather(city, ti):
     return {
         "execution_time": info["data"][0]["dt"],
         "temperature": info["data"][0]["temp"],
-        "humidity": info["data"][0]["clouds"],
-        "cloudiness": info["data"][0]["humidity"],
+        "humidity": info["data"][0]["humidity"],
+        "cloudiness": info["data"][0]["clouds"],
         "wind_speed": info["data"][0]["wind_speed"]
     }
 
