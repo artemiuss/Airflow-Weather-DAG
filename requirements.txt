@@ -2,3 +2,4 @@ apache-airflow<3.0.0
 pendulum
 apache-airflow-providers-postgres
 apache-airflow[postgres]
+apache-airflow-providers-http
