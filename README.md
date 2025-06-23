@@ -6,7 +6,7 @@
 
 ### Fetching docker-compose.yaml
 ```
-curl -LfO 'https://airflow.apache.org/docs/apache-airflow/3.0.2/docker-compose.yaml'
+curl -LfO 'https://airflow.apache.org/docs/apache-airflow/2.11.0/docker-compose.yaml'
 ```
 
 ### Initializing Environment
