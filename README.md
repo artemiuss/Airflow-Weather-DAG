@@ -2,7 +2,7 @@
 
 ## Usage notes
 
-## Setting up1
+## Setting up
 
 ### Fetching docker-compose.yaml
 ```
