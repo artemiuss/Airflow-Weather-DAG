@@ -6,6 +6,10 @@ from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow.providers.http.sensors.http import HttpSensor
 from airflow.utils import dates
 
+default_my_args = {
+    'owner': 'artemius'
+}
+
 cities_list = [
     {"city": "Lviv", "lat": "49.842957", "lon": "24.031111"},
     {"city": "Kyiv", "lat": "50.450001", "lon": "30.523333"},
@@ -27,15 +31,17 @@ def process_weather(city, ti):
 
 def create_table():
     pg_hook = PostgresHook(postgres_conn_id="pg_conn")
-    pg_hook.run("""CREATE TABLE IF NOT EXISTS measures (
-            id             SERIAL PRIMARY KEY,
-            city           TEXT,
-            execution_time TIMESTAMP NOT NULL,
-            temperature    NUMERIC,
-            humidity       INTEGER,
-            cloudiness     INTEGER,
-            wind_speed     NUMERIC);
-        """)
+    pg_hook.run("""CREATE TABLE IF NOT EXISTS measures
+(
+    id             SERIAL PRIMARY KEY,
+    city           TEXT,
+    execution_time TIMESTAMP NOT NULL,
+    temperature    NUMERIC,
+    humidity       INTEGER,
+    cloudiness     INTEGER,
+    wind_speed     NUMERIC
+);
+""")
 
 def extract_weather_data(city, execution_date, **context):
     http_hook = HttpHook(method='GET', http_conn_id='weather_api_conn')
@@ -49,10 +55,15 @@ def extract_weather_data(city, execution_date, **context):
     response = http_hook.run(endpoint="data/3.0/onecall/timemachine?", data=request_params)
     return response.json()
 
-with DAG(dag_id="weather_dag",
-        start_date=dates.days_ago(7),
-        schedule="@daily",
-        catchup=True) as dag:
+with DAG(
+    dag_id="weather_dag",
+    description="A DAG to fetch and process weather data for multiple cities",
+    tags=["weather", "api", "postgres"],
+    default_args=default_my_args,
+    start_date=dates.days_ago(7),
+    schedule="@daily",
+    catchup=True
+) as dag:
 
     db_create_table = PythonOperator(
         task_id="create_table",
@@ -77,8 +88,7 @@ with DAG(dag_id="weather_dag",
         extract_data = PythonOperator(
             task_id="extract_data_{}".format(city["city"]),
             python_callable=extract_weather_data,
-            op_args=[city],
-            provide_context=True
+            op_args=[city]
         )
 
         process_data = PythonOperator(
@@ -101,8 +111,7 @@ with DAG(dag_id="weather_dag",
                     ti.xcom_pull(task_ids=f"process_data_{city['city']}")["cloudiness"],
                     ti.xcom_pull(task_ids=f"process_data_{city['city']}")["wind_speed"]
                 )
-            ),
-            provide_context=True
+            )
         )
         
         db_create_table >> check_api >> extract_data >> process_data >> insert_data
